@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PathGuardian - Navigation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Specific Styles for Navigation UI */
+        .nav-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--white);
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .status-pill {
+            padding: 5px 12px;
+            border-radius: 20px;
+            background: #E0E7FF;
+            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .destination-input-container {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .destination-input {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid var(--primary-color);
+            font-size: 1.1rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .voice-btn {
+            width: 50px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 12px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .sos-btn {
+            background-color: var(--danger-color);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            border: none;
+            width: 100%;
+        }
+
+        .home-btn {
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            border: none;
+            width: 100%;
+        }
+
+        /* High Contrast Mode for Senior Accessibility */
+        body.high-contrast {
+            --primary-color: #000000;
+            --white: #ffffff;
+            --accent-color: #FFFF00;
+        }
+
+        /* ===== Ambient Environment Detection ===== */
+        .ambient-panel {
+            position: absolute;
+            bottom: 130px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            display: none;
+        }
+
+        .ambient-panel.active {
+            display: block;
+        }
+
+        .ambient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .ambient-header h4 {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ambient-toggle {
+            padding: 4px 12px;
+            border-radius: 16px;
+            border: 1px solid #E5E7EB;
+            background: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .ambient-toggle.listening {
+            background: #EF4444;
+            color: white;
+            border-color: #EF4444;
+        }
+
+        .ambient-env {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .ambient-env-icon {
+            font-size: 2.5rem;
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: #F3F4F6;
+        }
+
+        .ambient-env-info {
+            flex: 1;
+        }
+
+        .ambient-env-name {
+            font-weight: 700;
+            font-size: 1.15rem;
+            margin-bottom: 2px;
+        }
+
+        .ambient-env-desc {
+            font-size: 0.82rem;
+            color: var(--text-light);
+        }
+
+        .ambient-bars {
+            display: flex;
+            gap: 3px;
+            height: 32px;
+            align-items: flex-end;
+        }
+
+        .ambient-bar {
+            flex: 1;
+            border-radius: 3px;
+            background: var(--primary-color);
+            min-height: 3px;
+            transition: height 0.2s ease-out, background 0.3s;
+        }
+
+        .ambient-volume {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Top Status Bar -->
+        <div class="top-bar">
+            <span class="status-pill">● Online</span>
+            <button id="privateTimeBtn" class="btn btn-sm">🔒 Private</button>
+        </div>
+
+        <!-- Destination Input -->
+        <div class="destination-input-container">
+            <div class="input-group">
+                <input type="text" id="destInput" class="destination-input" placeholder="Where to?">
+                <button class="voice-btn">🎤</button>
+            </div>
+        </div>
+
+        <!-- Turn-by-Turn Overlay -->
+        <div id="turnInstruction" class="glass-panel"
+            style="position: absolute; top: 160px; left: 20px; right: 20px; padding: 15px; border-radius: 12px; display: none; z-index: 1000; align-items: center; gap: 15px;">
+            <div style="font-size: 2rem;">⬅️</div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.2rem;">Turn Left</h3>
+                <p style="margin: 0; color: var(--text-light);">in 50 meters</p>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Ambient Environment Detection Panel -->
+        <div id="ambientPanel" class="ambient-panel">
+            <div class="ambient-header">
+                <h4>🎙️ Environment Detection</h4>
+                <button id="ambientToggle" class="ambient-toggle">Start Listening</button>
+            </div>
+            <div class="ambient-env">
+                <div class="ambient-env-icon" id="ambientIcon">🌍</div>
+                <div class="ambient-env-info">
+                    <div class="ambient-env-name" id="ambientName">Tap to detect</div>
+                    <div class="ambient-env-desc" id="ambientDesc">Allow microphone to analyze your surroundings</div>
+                </div>
+            </div>
+            <div class="ambient-bars" id="ambientBars">
+                <!-- 16 bars generated by JS -->
+            </div>
+            <div class="ambient-volume">
+                <span id="ambientVolume">Volume: --</span>
+                <span id="ambientFreq">Freq: --</span>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="nav-overlay">
+            <button class="home-btn" onclick="app.navigateHome()">🏠 Take Me Home</button>
+            <button class="sos-btn" onclick="app.triggerSOS()">🆘 Emergency</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="js/simulation.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/ambient.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Wire up ambient panel
+        document.addEventListener('DOMContentLoaded', () => {
+            const panel = document.getElementById('ambientPanel');
+            const toggle = document.getElementById('ambientToggle');
+            const barsContainer = document.getElementById('ambientBars');
+
+            // Show the panel
+            if (panel) panel.classList.add('active');
+
+            // Create 16 bars
+            for (let i = 0; i < 16; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'ambient-bar';
+                bar.style.height = '3px';
+                barsContainer.appendChild(bar);
+            }
+
+            // Toggle listening
+            toggle.addEventListener('click', async () => {
+                if (!window.ambientAnalyzer) return;
+
+                if (window.ambientAnalyzer.isListening) {
+                    window.ambientAnalyzer.stop();
+                    toggle.textContent = 'Start Listening';
+                    toggle.classList.remove('listening');
+                    document.getElementById('ambientName').textContent = 'Paused';
+                    document.getElementById('ambientDesc').textContent = 'Tap to resume environment detection';
+                    document.getElementById('ambientIcon').textContent = '🌍';
+                    // Reset bars
+                    barsContainer.querySelectorAll('.ambient-bar').forEach(b => {
+                        b.style.height = '3px';
+                        b.style.background = 'var(--primary-color)';
+                    });
+                } else {
+                    const ok = await window.ambientAnalyzer.start();
+                    if (ok) {
+                        toggle.textContent = '⏹ Stop';
+                        toggle.classList.add('listening');
+                    } else {
+                        document.getElementById('ambientName').textContent = 'Mic Blocked';
+                        document.getElementById('ambientDesc').textContent = 'Please allow microphone access in your browser';
+                    }
+                }
+            });
+
+            // Handle analysis results
+            if (window.ambientAnalyzer) {
+                window.ambientAnalyzer.onUpdate((data) => {
+                    const env = data.environment;
+
+                    document.getElementById('ambientName').textContent = env.name;
+                    document.getElementById('ambientDesc').textContent = env.desc;
+                    document.getElementById('ambientIcon').textContent = env.icon;
+                    document.getElementById('ambientIcon').style.background = env.color + '20';
+                    document.getElementById('ambientVolume').textContent = `Volume: ${data.volumeDb} dB`;
+                    document.getElementById('ambientFreq').textContent = `Type: ${data.freqProfile}`;
+
+                    // Update bars
+                    const bars = barsContainer.querySelectorAll('.ambient-bar');
+                    data.bars.forEach((val, i) => {
+                        if (bars[i]) {
+                            bars[i].style.height = Math.max(3, val * 32) + 'px';
+                            bars[i].style.background = env.color;
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
